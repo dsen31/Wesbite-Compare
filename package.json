@@ -9,7 +9,8 @@
   "scripts": {
     "start": "node src/cli.js",
     "demo": "node src/cli.js demo",
-    "test": "node --test test/unit.test.js test/integration.test.js"
+    "ui": "node src/ui-server.js",
+    "test": "node --test test/unit.test.js test/integration.test.js test/ui.test.js"
   },
   "engines": {
     "node": ">=18.17"

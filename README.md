@@ -22,7 +22,8 @@ Compares two websites that are meant to match (for example a live site and its r
 Requires Node.js 18.17 or newer.
 
 ```bash
-cd sitediff
+git clone https://github.com/dsen31/Wesbite-Compare.git
+cd Wesbite-Compare
 npm install
 npx playwright install chromium
 ```
@@ -35,7 +36,7 @@ The second command downloads the headless browser, which JavaScript rendering an
 npm test
 ```
 
-This runs unit tests plus end-to-end runs against two bundled demo sites and some deliberately broken servers (timeouts, HTTP 500, an unreachable host).
+This runs unit tests plus end-to-end runs against two bundled demo sites and some deliberately broken servers (timeouts, HTTP 500, an unreachable host). It also tests the web page's server: a full run, Stop, and its safety checks.
 
 ```bash
 npm run demo
@@ -49,7 +50,22 @@ This compares the demo sites in `demo/site-a` (Live) and `demo/site-b` (Redesign
 
 The FAQ page differs only by noise and correctly shows no page-specific differences.
 
-## Compare two sites
+## Use the web page (easiest)
+
+```bash
+npm run ui
+```
+
+This opens http://localhost:3000 in your browser. On that page you can:
+1. Enter the two web addresses, and optionally a name for each (e.g. "Live" and "Redesign").
+2. Choose the pages per site, JavaScript rendering, screenshot comparison, and whether to respect robots.txt.
+3. Click **Compare** and watch the progress for each site. **Stop** ends a long run early and still writes a report of what was compared.
+4. Read the report on the same page, or open it in its own tab.
+5. Reopen earlier results from **Past comparisons**. Every run is saved in `reports/`.
+
+Click **Fill in the demo sites** to try it without real URLs. The page only runs on your own computer and runs one comparison at a time. Press Ctrl+C in the terminal to shut it down. Options: `npm run ui -- --port 4000 --config my-settings.json`.
+
+## Compare two sites from the command line
 
 ```bash
 node src/cli.js https://www.example.com https://staging.example.com --label-a Live --label-b Staging --open
@@ -110,6 +126,8 @@ Significance levels:
 ```
 src/config.js     every setting and ignore rule (start here)
 src/cli.js        command line
+src/ui-server.js  local web page server (npm run ui) and its small JSON/event API
+src/ui/index.html the web page
 src/index.js      orchestration: render decision -> crawl -> pair -> compare -> report
 src/fetcher.js    HTTP (rate limit, robots.txt, retries, redirects) and Playwright rendering/screenshots
 src/crawler.js    bounded breadth-first crawl + direct "probe" requests

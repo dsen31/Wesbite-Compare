@@ -118,7 +118,10 @@ export async function pairPages(crawlA, crawlB, cfg, log) {
     if (c.robotsBlocked.has(k)) return { state: 'robots', text: 'not checked: disallowed by robots.txt' };
     const alias = c.aliases.get(k);
     const rec = c.pages.get(alias ?? k);
-    if (!rec) return { state: 'unknown', text: c.unreachable ? `not checked: site unreachable (${c.unreachable})` : 'not checked (crawl.maxProbes limit reached)' };
+    if (!rec) {
+      const why = c.unreachable ? `site unreachable (${c.unreachable})` : c.site.signal?.aborted ? 'run was stopped early' : 'crawl.maxProbes limit reached';
+      return { state: 'unknown', text: `not checked: ${why}` };
+    }
     if (alias) return { state: 'redirect', text: `redirects to ${alias}${usedOf(c).has(alias) ? ' (a page matched to a different page on the other site)' : ''}`, rec };
     const st = pageState(rec);
     return { state: st, text: st === 'missing' ? `returns HTTP ${rec.status}` : rec.error || `returns HTTP ${rec.status}`, rec };

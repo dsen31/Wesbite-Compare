@@ -119,7 +119,7 @@ export class SiteCrawler {
 
     let fetched = 0;
     let sitemapDone = !useSitemap;
-    while (queue.length && fetched < maxPages) {
+    while (queue.length && fetched < maxPages && !this.site.signal?.aborted) {
       const item = queue.shift();
       const reqKey = toKey(item.url, scope, this.cfg);
       if (this.pages.has(reqKey) || this.aliases.has(reqKey)) continue;
@@ -163,7 +163,7 @@ export class SiteCrawler {
     if (this.pages.has(key)) return key;
     if (this.aliases.has(key)) return this.aliases.get(key);
     if (this.robotsBlocked.has(key)) return 'robots';
-    if (this.unreachable) return null;
+    if (this.unreachable || this.site.signal?.aborted) return null;
     if (this.probesUsed >= this.cfg.crawl.maxProbes) return null;
     this.probesUsed++;
     const url = keyToUrl(key, this.site.scope);

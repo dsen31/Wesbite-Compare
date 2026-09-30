@@ -68,7 +68,7 @@ function pageDiffs(p, crawlA, crawlB, L) {
   return out;
 }
 
-function runFolderName(scopeA, scopeB) {
+export function runFolderName(scopeA, scopeB) {
   const ts = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
   const clean = (h) => h.replace(/[^a-z0-9.-]+/gi, '_');
   return `${clean(scopeA.host)}-vs-${clean(scopeB.host)}-${ts}`;
@@ -76,10 +76,12 @@ function runFolderName(scopeA, scopeB) {
 
 /**
  * Run a comparison.
- * @param {object} opts { urlA, urlB, cfg, log }
+ * @param {object} opts { urlA, urlB, cfg, log, signal }
+ *   signal  optional AbortSignal: stops crawling early; the report still covers
+ *           whatever was fetched so far.
  * @returns {Promise<{ result, reportPath, jsonPath }>}
  */
-export async function runComparison({ urlA, urlB, cfg, log = console.log }) {
+export async function runComparison({ urlA, urlB, cfg, log = console.log, signal }) {
   const started = new Date();
   const L = { A: cfg.output.labelA, B: cfg.output.labelB };
   const notes = [];
@@ -108,15 +110,19 @@ export async function runComparison({ urlA, urlB, cfg, log = console.log }) {
     log(`Render mode: ${renderMode}`);
 
     // --- crawl both sites in parallel (different hosts, each rate-limited on its own)
-    const crawlA = new SiteCrawler({ id: 'A', label: L.A, scope: scopeA, renderMode }, fetcher, cfg, log);
-    const crawlB = new SiteCrawler({ id: 'B', label: L.B, scope: scopeB, renderMode }, fetcher, cfg, log);
+    const crawlA = new SiteCrawler({ id: 'A', label: L.A, scope: scopeA, renderMode, signal }, fetcher, cfg, log);
+    const crawlB = new SiteCrawler({ id: 'B', label: L.B, scope: scopeB, renderMode, signal }, fetcher, cfg, log);
     await Promise.all([crawlA.crawl(), crawlB.crawl()]);
+    if (signal?.aborted) {
+      notes.push('WARNING: this run was stopped early. Only the pages fetched before stopping were compared, and "only on one site" results may be incomplete.');
+      log('Stopped early; writing a report for the pages fetched so far');
+    }
     for (const c of [crawlA, crawlB]) {
       const lab = L[c.site.id];
       if (c.unreachable) notes.push(`ERROR: ${lab} could not be reached at ${c.site.scope.startUrl}: ${c.unreachable}.`);
       if (c.limitReached) notes.push(`${lab}: the page limit (${cfg.crawl.maxPages}) was reached, so some pages were not crawled. Raise it with --max-pages.`);
       const robots = c.skipped.filter((s) => s.reason.includes('robots')).length;
-      if (robots) notes.push(`${lab}: ${robots} URL(s) were not fetched because robots.txt disallows them (use --ignore-robots to include them).`);
+      if (robots) notes.push(`${lab}: ${robots} URL(s) were not fetched because robots.txt disallows them. To include them, turn off "Respect robots.txt" (command line: --ignore-robots).`);
     }
     if (fetcher.browserError && renderMode === 'auto' && [...crawlA.pages.values(), ...crawlB.pages.values()].some((r) => r.renderError)) {
       notes.push(`WARNING: some pages looked JavaScript-rendered but ${fetcher.browserError}. They were compared as plain HTML.`);
@@ -147,7 +153,7 @@ export async function runComparison({ urlA, urlB, cfg, log = console.log }) {
         p.diffs.push(...compareSnapshots(p.recA.snapshot, p.recB.snapshot, ctx));
         if (p.recA.rendered !== p.recB.rendered) p.notes.push(`Rendered in a browser on ${p.recA.rendered ? L.A : L.B} only (it looked JavaScript-dependent there).`);
         for (const [r, lab] of [[p.recA, L.A], [p.recB, L.B]]) if (r.renderError) p.notes.push(`${lab}: browser rendering failed (${r.renderError}); plain HTML was compared.`);
-        if (cfg.visual.enabled && !skip.has('visual') && visualCount < cfg.visual.maxPages) {
+        if (cfg.visual.enabled && !skip.has('visual') && visualCount < cfg.visual.maxPages && !signal?.aborted) {
           visualCount++;
           log(`Visual compare ${p.path}`);
           p.diffs.push(...(await compareVisual(p, fetcher, cfg, assetsDir, visualCount)));

@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SiteDiff</title>
+<style>
+:root{--bg:#fff;--fg:#1d2433;--muted:#667085;--line:#e4e7ec;--panel:#f8f9fb;--accent:#175cd3;--accent-fg:#fff;--link:#175cd3;
+--error:#b42318;--missing:#c4320a;--changed:#a15c07;--added:#067647;--structural:#5925dc;--cosmetic:#667085;--bar:#d0d5dd}
+@media (prefers-color-scheme:dark){:root{--bg:#12151c;--fg:#e6e8ec;--muted:#98a2b3;--line:#2b303b;--panel:#1a1e27;--accent:#528bff;--accent-fg:#0b0e14;--link:#84adff;
+--error:#f97066;--missing:#fb6514;--changed:#fdb022;--added:#47cd89;--structural:#a48afb;--cosmetic:#98a2b3;--bar:#344054}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1200px;margin:0 auto;padding:24px 16px 64px}
+a{color:var(--link)}
+h1{font-size:24px;margin:0}h2{font-size:18px;margin:0 0 12px}
+.sub{color:var(--muted);margin:2px 0 20px}
+.card{border:1px solid var(--line);border-radius:12px;padding:18px;margin:0 0 18px;background:var(--bg)}
+.sites{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:720px){.sites{grid-template-columns:1fr}}
+.site{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.site h3{margin:0 0 8px;font-size:14px}.site h3 small{color:var(--muted);font-weight:400}
+label{display:block;font-size:13px;color:var(--muted);margin:8px 0 3px}
+input[type=text],input[type=url],input[type=number],select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:inherit}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+.options{display:flex;flex-wrap:wrap;gap:12px 22px;align-items:flex-end;margin-top:14px}
+.options .field{min-width:150px}
+.check{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--fg);margin:0 0 8px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px}
+button{font:inherit;border-radius:8px;padding:8px 16px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--fg)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:600}
+button:disabled{opacity:.55;cursor:not-allowed}
+button.link{border:0;background:none;color:var(--link);padding:8px 4px;text-decoration:underline}
+.err{color:var(--error);font-size:14px;margin:10px 0 0;min-height:1em}
+.hint{color:var(--muted);font-size:13px}
+.status{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-bottom:10px}
+.pill{font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;border:1px solid currentColor}
+.pill.running{color:var(--accent)}.pill.done{color:var(--added)}.pill.stopped{color:var(--changed)}.pill.failed{color:var(--error)}
+.bars{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:720px){.bars{grid-template-columns:1fr}}
+.bar{height:8px;background:var(--bar);border-radius:99px;overflow:hidden}.bar>div{height:100%;width:0;background:var(--accent);transition:width .3s}
+.barlabel{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:4px;gap:8px}
+.barlabel span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+details.log{margin-top:12px}details.log summary{cursor:pointer;color:var(--muted);font-size:13px}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px;max-height:260px;overflow:auto;font-size:12px;margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:4px 0 14px}
+.tile{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.tile b{display:block;font-size:24px;line-height:1.2}.tile span{font-size:12px;color:var(--muted)}
+.tile.bad b{color:var(--error)}.tile.warn b{color:var(--missing)}.tile.good b{color:var(--added)}
+.reporthead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px}
+iframe{width:100%;height:80vh;border:1px solid var(--line);border-radius:10px;background:#fff}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);white-space:nowrap}
+td.num{text-align:right;white-space:nowrap}td.sitecell{overflow-wrap:anywhere;min-width:140px}
+td .muted{color:var(--muted);font-size:12px}
+@media (max-width:720px){
+  #past thead{display:none}
+  #past tr{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;padding:10px 0;border-bottom:1px solid var(--line)}
+  #past td{border:0;padding:2px 0;min-width:0}
+  #past td:first-child{grid-column:1/-1}
+  #past td.num{text-align:left}
+  #past td.num::before{content:attr(data-label) ": ";color:var(--muted);font-size:12px}
+  #past td:last-child{grid-column:1/-1}
+}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <h1>SiteDiff</h1>
+  <p class="sub">Compare two websites that should match, such as a live site and its redesign, and see every difference.</p>
+
+  <form id="form" class="card" novalidate>
+    <div class="sites">
+      <div class="site">
+        <h3>Site A <small>the baseline, e.g. the live site</small></h3>
+        <label for="urlA">Web address</label>
+        <input id="urlA" type="url" placeholder="https://www.example.com" autocomplete="url" required>
+        <label for="labelA">Name in the report</label>
+        <input id="labelA" type="text" placeholder="Live" maxlength="40">
+      </div>
+      <div class="site">
+        <h3>Site B <small>the one being checked, e.g. the redesign</small></h3>
+        <label for="urlB">Web address</label>
+        <input id="urlB" type="url" placeholder="https://staging.example.com" autocomplete="url" required>
+        <label for="labelB">Name in the report</label>
+        <input id="labelB" type="text" placeholder="Redesign" maxlength="40">
+      </div>
+    </div>
+    <div class="options">
+      <div class="field"><label for="maxPages">Pages per site</label><input id="maxPages" type="number" min="1" max="5000" value="100"></div>
+      <div class="field"><label for="render">JavaScript rendering</label>
+        <select id="render">
+          <option value="auto">Automatic</option>
+          <option value="always">Always (slower, most accurate)</option>
+          <option value="never">Never (plain HTML only)</option>
+        </select></div>
+      <label class="check"><input id="visual" type="checkbox"> Compare screenshots (slower)</label>
+      <label class="check"><input id="respectRobots" type="checkbox" checked> Respect robots.txt</label>
+    </div>
+    <div class="actions">
+      <button id="go" class="primary" type="submit">Compare</button>
+      <button id="demo" class="link" type="button">Fill in the demo sites</button>
+      <span class="hint">Requests are spaced out so the sites aren't overloaded; 100 pages takes a couple of minutes.</span>
+    </div>
+    <p id="err" class="err" role="alert"></p>
+  </form>
+
+  <section id="runCard" class="card hidden" aria-live="polite">
+    <div class="status">
+      <h2 id="runTitle" style="margin:0">Comparing</h2>
+      <span id="pill" class="pill running">Running</span>
+      <span id="phase" class="hint"></span>
+      <button id="stop" type="button">Stop</button>
+    </div>
+    <div class="bars">
+      <div><div class="barlabel"><span id="barLabelA">Site A</span><span id="barCountA">0</span></div><div class="bar"><div id="barA"></div></div></div>
+      <div><div class="barlabel"><span id="barLabelB">Site B</span><span id="barCountB">0</span></div><div class="bar"><div id="barB"></div></div></div>
+    </div>
+    <details class="log"><summary>Activity log</summary><pre id="log"></pre></details>
+  </section>
+
+  <section id="resultCard" class="card hidden">
+    <div class="reporthead">
+      <h2 id="resultTitle">Report</h2>
+      <a id="openTab" href="#" target="_blank" rel="noopener">Open the report in a new tab</a>
+    </div>
+    <iframe id="frame" title="Comparison report"></iframe>
+  </section>
+
+  <section class="card">
+    <h2>Past comparisons</h2>
+    <div id="pastEmpty" class="hint">None yet. Results appear here after your first comparison.</div>
+    <div class="tablewrap"><table id="past" class="hidden">
+      <thead><tr><th>When</th><th>Site A</th><th>Site B</th><th>Compared</th><th>With differences</th><th>Only on A</th><th>Only on B</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fields = ['urlA', 'labelA', 'urlB', 'labelB', 'maxPages', 'render', 'visual', 'respectRobots'];
+  let source = null, currentId = null;
+
+  // Remember the last form values in this browser (convenience only).
+  function saveForm() {
+    try { localStorage.setItem('sitediff-form', JSON.stringify(Object.fromEntries(fields.map((f) => [f, $(f).type === 'checkbox' ? $(f).checked : $(f).value])))); } catch {}
+  }
+  function loadForm() {
+    try {
+      const v = JSON.parse(localStorage.getItem('sitediff-form') || 'null');
+      if (v) for (const f of fields) if (f in v) { if ($(f).type === 'checkbox') $(f).checked = v[f]; else $(f).value = v[f]; }
+    } catch {}
+  }
+
+  function setBusy(busy) {
+    $('go').disabled = busy;
+    $('go').textContent = busy ? 'Comparing…' : 'Compare';
+  }
+
+  // The report has its own summary at the top, so the UI just frames it.
+  function showReport(id, title) {
+    const src = `/reports/${encodeURIComponent(id)}/report.html`;
+    $('resultCard').classList.remove('hidden');
+    $('resultTitle').textContent = title || 'Report';
+    $('openTab').href = src;
+    $('frame').src = src;
+  }
+
+  function updateProgress(run) {
+    for (const side of ['A', 'B']) {
+      const p = run.progress?.[side] || { n: 0, max: 0 };
+      $('bar' + side).style.width = p.max ? Math.min(100, (p.n / p.max) * 100) + '%' : '0';
+      $('barCount' + side).textContent = `${p.n} / ${p.max} pages`;
+    }
+    if (run.phase) $('phase').textContent = run.phase;
+  }
+
+  function setStatus(status) {
+    const text = { running: 'Running', done: 'Finished', stopped: 'Stopped early', failed: 'Failed' }[status] || status;
+    $('pill').className = 'pill ' + status;
+    $('pill').textContent = text;
+    $('stop').classList.toggle('hidden', status !== 'running');
+  }
+
+  function appendLog(line) {
+    const pre = $('log');
+    const atBottom = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 20;
+    pre.textContent += line + '\n';
+    if (pre.textContent.length > 200000) pre.textContent = pre.textContent.slice(-150000);
+    if (atBottom) pre.scrollTop = pre.scrollHeight;
+  }
+
+  function follow(run) {
+    currentId = run.id;
+    if (source) source.close();
+    $('runCard').classList.remove('hidden');
+    $('runTitle').textContent = `${run.labelA} vs ${run.labelB}`;
+    $('barLabelA').textContent = `A · ${run.labelA} · ${run.urlA}`;
+    $('barLabelB').textContent = `B · ${run.labelB} · ${run.urlB}`;
+    $('log').textContent = '';
+    setStatus(run.status || 'running');
+    updateProgress(run);
+    setBusy(true);
+    source = new EventSource(`/api/runs/${encodeURIComponent(run.id)}/events`);
+    source.addEventListener('state', (e) => {
+      const s = JSON.parse(e.data);
+      $('log').textContent = '';
+      s.lines.forEach(appendLog);
+      updateProgress(s);
+    });
+    source.addEventListener('log', (e) => { const d = JSON.parse(e.data); appendLog(d.line); updateProgress(d); });
+    const finish = (e) => {
+      const r = JSON.parse(e.data);
+      source.close(); source = null;
+      setBusy(false);
+      setStatus(r.status);
+      updateProgress(r);
+      if (r.status === 'failed') { $('err').textContent = `The comparison failed: ${r.error}`; }
+      else {
+        showReport(r.id, `${r.labelA} vs ${r.labelB}`);
+        $('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      loadPast();
+    };
+    source.addEventListener('done', finish);
+    source.addEventListener('failed', finish);
+    source.onerror = () => { if (source && source.readyState === EventSource.CLOSED) { setBusy(false); } };
+  }
+
+  async function loadPast() {
+    try {
+      const data = await (await fetch('/api/runs')).json();
+      const rows = data.runs.map((r) => {
+        const when = new Date(r.generatedAt);
+        const s = r.summary;
+        return `<tr>
+          <td>${esc(when.toLocaleDateString())}<br><span class="muted">${esc(when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}${r.stopped ? ' · stopped early' : ''}</span></td>
+          <td class="sitecell">A · ${esc(r.siteA.label)}<br><span class="muted">${esc(r.siteA.url)}</span></td>
+          <td class="sitecell">B · ${esc(r.siteB.label)}<br><span class="muted">${esc(r.siteB.url)}</span></td>
+          <td class="num" data-label="Compared">${s.pagesCompared}</td><td class="num" data-label="With differences">${s.withDifferences}</td>
+          <td class="num" data-label="Only on A">${s.onlyA}</td><td class="num" data-label="Only on B">${s.onlyB}</td>
+          <td><button type="button" data-open="${esc(r.id)}">View</button></td></tr>`;
+      });
+      $('past').querySelector('tbody').innerHTML = rows.join('');
+      $('past').classList.toggle('hidden', !rows.length);
+      $('pastEmpty').classList.toggle('hidden', !!rows.length);
+      $('past').querySelectorAll('button[data-open]').forEach((b) => b.addEventListener('click', () => {
+        const r = data.runs.find((x) => x.id === b.dataset.open);
+        showReport(r.id, `${r.siteA.label} vs ${r.siteB.label} · ${new Date(r.generatedAt).toLocaleString()}`);
+        $('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }));
+      return data;
+    } catch { return null; }
+  }
+
+  $('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('err').textContent = '';
+    const body = {
+      urlA: $('urlA').value, urlB: $('urlB').value,
+      labelA: $('labelA').value || 'Site A', labelB: $('labelB').value || 'Site B',
+      maxPages: Number($('maxPages').value), render: $('render').value,
+      visual: $('visual').checked, respectRobots: $('respectRobots').checked,
+    };
+    saveForm();
+    setBusy(true);
+    try {
+      const res = await fetch('/api/runs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) { $('err').textContent = data.error || 'Could not start the comparison.'; setBusy(false); return; }
+      $('resultCard').classList.add('hidden');
+      follow(data);
+    } catch {
+      $('err').textContent = 'Could not reach the SiteDiff server. Is it still running?';
+      setBusy(false);
+    }
+  });
+
+  $('stop').addEventListener('click', async () => {
+    if (!currentId) return;
+    $('stop').disabled = true;
+    try { await fetch(`/api/runs/${encodeURIComponent(currentId)}/stop`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); } catch {}
+    $('stop').disabled = false;
+  });
+
+  $('demo').addEventListener('click', async () => {
+    $('err').textContent = '';
+    try {
+      const d = await (await fetch('/api/demo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json();
+      $('urlA').value = d.urlA; $('urlB').value = d.urlB; $('labelA').value = d.labelA; $('labelB').value = d.labelB;
+    } catch { $('err').textContent = 'Could not start the demo sites.'; }
+  });
+
+  loadForm();
+  loadPast().then((data) => { if (data?.current) follow(data.current); });
+})();
+</script>
+</body>
+</html>
